@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>StudyMind — AI Study Assistant</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0d0f14;
+    --surface: #161923;
+    --surface2: #1e2433;
+    --border: #2a3045;
+    --accent: #7c6af7;
+    --accent2: #a78bfa;
+    --green: #34d399;
+    --red: #f87171;
+    --text: #e8eaf0;
+    --muted: #6b7595;
+    --dim: #3d4561;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .ambient {
+    position: fixed;
+    width: 600px; height: 600px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(124,106,247,0.07) 0%, transparent 70%);
+    top: -200px; right: -200px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  header {
+    position: relative;
+    z-index: 1;
+    padding: 28px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo { display: flex; align-items: center; gap: 12px; }
+
+  .logo-icon {
+    width: 38px; height: 38px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+
+  .logo-text { font-family: 'DM Serif Display', serif; font-size: 22px; letter-spacing: -0.3px; }
+  .logo-text span { color: var(--accent2); font-style: italic; }
+
+  .status-pill {
+    display: flex; align-items: center; gap: 7px;
+    padding: 6px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    font-size: 12px; color: var(--muted);
+  }
+
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  main {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    max-width: 1000px;
+    margin: 0 auto;
+    width: 100%;
+    padding: 40px 24px 60px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  .section-label {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+  .section-label::after { content:''; flex:1; height:1px; background:var(--border); }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    transition: border-color 0.2s;
+  }
+  .card:hover { border-color: var(--dim); }
+
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 36px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(124,106,247,0.05);
+  }
+  .upload-zone input[type="file"] {
+    position: absolute; inset: 0;
+    opacity: 0; cursor: pointer;
+    width: 100%; height: 100%;
+  }
+  .upload-icon { font-size: 36px; margin-bottom: 12px; display: block; }
+  .upload-text { font-size: 15px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
+  .upload-subtext { font-size: 12px; color: var(--muted); }
+
+  .upload-actions { display: flex; gap: 10px; margin-top: 16px; }
+
+  .file-badge {
+    display: none; align-items: center; gap: 8px;
+    padding: 8px 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px; color: var(--text);
+    margin-top: 12px;
+  }
+  .file-badge.show { display: flex; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px; font-weight: 500;
+    cursor: pointer; border: none;
+    transition: all 0.15s;
+    letter-spacing: 0.1px;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #fff;
+    box-shadow: 0 4px 16px rgba(124,106,247,0.3);
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(124,106,247,0.4); }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-secondary {
+    background: var(--surface2); color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { border-color: var(--dim); background: #262d40; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
+
+  .query-input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px; color: var(--text);
+    outline: none; resize: none;
+    min-height: 80px;
+    transition: border-color 0.2s;
+    line-height: 1.5;
+  }
+  .query-input::placeholder { color: var(--muted); }
+  .query-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(124,106,247,0.12);
+  }
+
+  .query-actions {
+    display: flex; gap: 10px;
+    margin-top: 12px;
+    flex-wrap: wrap; align-items: center;
+  }
+
+  .docs-list { display: flex; flex-direction: column; gap: 8px; }
+
+  .doc-item {
+    display: flex; align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 13px;
+    animation: fadeIn 0.3s ease;
+  }
+  .doc-item-left { display: flex; align-items: center; gap: 10px; color: var(--text); }
+  .doc-icon { color: var(--accent2); font-size: 16px; }
+  .doc-del {
+    background: none; border: none;
+    color: var(--muted); cursor: pointer;
+    font-size: 16px; padding: 4px;
+    border-radius: 6px;
+    transition: all 0.15s; line-height: 1;
+  }
+  .doc-del:hover { color: var(--red); background: rgba(248,113,113,0.1); }
+
+  .empty-docs {
+    text-align: center; padding: 28px;
+    color: var(--muted); font-size: 13px;
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+  }
+
+  .output-area { min-height: 100px; }
+
+  .output-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    font-size: 14px; line-height: 1.75;
+    color: var(--text);
+    white-space: pre-wrap; word-break: break-word;
+    animation: fadeIn 0.3s ease;
+  }
+
+  .output-placeholder {
+    color: var(--muted); font-size: 14px;
+    text-align: center; padding: 40px;
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+  }
+
+  .sources-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+  .source-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 10px;
+    background: rgba(124,106,247,0.12);
+    border: 1px solid rgba(124,106,247,0.25);
+    border-radius: 100px;
+    font-size: 11px; color: var(--accent2);
+  }
+
+  #toast {
+    position: fixed; bottom: 28px; right: 28px;
+    z-index: 999;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .toast-item {
+    padding: 12px 18px; border-radius: 10px;
+    font-size: 13px; font-weight: 500;
+    max-width: 320px;
+    animation: slideUp 0.3s ease;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .toast-success { background: rgba(52,211,153,0.15); border:1px solid rgba(52,211,153,0.3); color:var(--green); }
+  .toast-error   { background: rgba(248,113,113,0.15); border:1px solid rgba(248,113,113,0.3); color:var(--red); }
+  .toast-info    { background: rgba(124,106,247,0.15); border:1px solid rgba(124,106,247,0.3); color:var(--accent2); }
+
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  .output-loading {
+    display: flex; align-items: center; gap: 12px;
+    padding: 28px;
+    border: 1px solid var(--border); border-radius: 12px;
+    color: var(--muted); font-size: 14px;
+  }
+  .output-loading .spinner {
+    border-color: rgba(124,106,247,0.3);
+    border-top-color: var(--accent);
+  }
+
+  .top-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+  @media (max-width: 700px) {
+    .top-grid { grid-template-columns: 1fr; }
+    header { padding: 18px 20px; }
+    main { padding: 24px 16px 40px; }
+    .upload-zone { padding: 24px; }
+    .query-actions { flex-direction: column; }
+    .btn { justify-content: center; }
+  }
+
+  @keyframes fadeIn  { from{opacity:0;transform:translateY(6px)}  to{opacity:1;transform:translateY(0)} }
+  @keyframes slideUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes spin    { to{transform:rotate(360deg)} }
+
+  .tab-row {
+    display: flex; gap: 6px; padding: 4px;
+    background: var(--surface2);
+    border-radius: 10px; width: fit-content;
+    border: 1px solid var(--border);
+  }
+  .tab {
+    padding: 7px 16px; border-radius: 7px;
+    font-size: 13px; font-weight: 500;
+    cursor: pointer; border: none;
+    background: transparent; color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+    transition: all 0.15s;
+  }
+  .tab.active {
+    background: var(--surface); color: var(--text);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+</style>
+</head>
+<body>
+<div class="ambient"></div>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">📖</div>
+    <div class="logo-text">Study<span>Mind</span></div>
+  </div>
+  <div class="status-pill">
+    <span class="status-dot" id="statusDot"></span>
+    <span id="statusLabel">Connecting…</span>
+  </div>
+</header>
+
+<main>
+
+  <div class="top-grid">
+    <!-- UPLOAD -->
+    <div class="card">
+      <div class="section-label">Upload Document</div>
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" id="fileInput" accept=".txt,.pdf" onchange="handleFileSelect(event)" />
+        <span class="upload-icon">📄</span>
+        <div class="upload-text">Drop a file or click to browse</div>
+        <div class="upload-subtext">Supports .pdf and .txt</div>
+      </div>
+      <div class="file-badge" id="fileBadge">
+        <span>📎</span>
+        <span id="fileName"></span>
+      </div>
+      <div class="upload-actions">
+        <button class="btn btn-primary" onclick="uploadFile()" id="uploadBtn" disabled>
+          <span>⬆</span> Upload
+        </button>
+        <button class="btn btn-secondary" onclick="clearFile()">Clear</button>
+      </div>
+    </div>
+
+    <!-- DOCUMENTS -->
+    <div class="card">
+      <div class="section-label">Uploaded Documents</div>
+      <div class="docs-list" id="docsList">
+        <div class="empty-docs">No documents yet.<br/>Upload one to get started.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- QUERY -->
+  <div class="card">
+    <div class="section-label">Ask or Summarize</div>
+    <textarea class="query-input" id="queryInput"
+      placeholder="E.g. What are the key concepts? or Summarize the introduction…"
+      rows="3"></textarea>
+    <div class="query-actions">
+      <div class="tab-row">
+        <button class="tab active" id="tabAsk" onclick="setMode('ask')">Ask Question</button>
+        <button class="tab" id="tabSummarize" onclick="setMode('summarize')">Summarize</button>
+      </div>
+      <button class="btn btn-primary" onclick="runQuery()" id="queryBtn">
+        <span>✦</span> <span id="queryBtnText">Ask</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- OUTPUT -->
+  <div class="card output-area">
+    <div class="section-label">Answer</div>
+    <div id="outputContainer">
+      <div class="output-placeholder">Your answer will appear here…</div>
+    </div>
+  </div>
+
+</main>
+
+<div id="toast"></div>
+
+<script>
+  // ── Injected by Python — do not edit this line manually ──
+  const API = "https://tomeka-humuslike-bioclimatologically.ngrok-free.dev"
+
+  let selectedFile = null;
+  let mode = 'ask';
+
+  // ── HEALTH CHECK ──────────────────────────────
+  async function checkHealth() {
+    const label = document.getElementById('statusLabel');
+    const dot   = document.getElementById('statusDot');
+    try {
+      const r = await fetch(`${API}/health`, { signal: AbortSignal.timeout(5000) });
+      if (r.ok) {
+        label.textContent = 'Connected';
+        dot.style.background = 'var(--green)';
+        dot.style.boxShadow  = '0 0 8px var(--green)';
+      } else throw new Error();
+    } catch {
+      label.textContent = 'Offline';
+      dot.style.background = 'var(--red)';
+      dot.style.boxShadow  = '0 0 8px var(--red)';
+    }
+  }
+
+  // ── FILE SELECT ───────────────────────────────
+  function handleFileSelect(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    selectedFile = file;
+    document.getElementById('fileName').textContent = file.name;
+    document.getElementById('fileBadge').classList.add('show');
+    document.getElementById('uploadBtn').disabled = false;
+  }
+
+  function clearFile() {
+    selectedFile = null;
+    document.getElementById('fileInput').value = '';
+    document.getElementById('fileBadge').classList.remove('show');
+    document.getElementById('uploadBtn').disabled = true;
+  }
+
+  const zone = document.getElementById('uploadZone');
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    selectedFile = file;
+    document.getElementById('fileName').textContent = file.name;
+    document.getElementById('fileBadge').classList.add('show');
+    document.getElementById('uploadBtn').disabled = false;
+  });
+
+  // ── UPLOAD ────────────────────────────────────
+  async function uploadFile() {
+    if (!selectedFile) return;
+    const btn = document.getElementById('uploadBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Uploading…';
+
+    const fd = new FormData();
+    fd.append('file', selectedFile);
+
+    try {
+      const r = await fetch(`${API}/upload`, { method: 'POST', body: fd });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.detail || 'Upload failed');
+      toast(`✓ Uploaded — ${data.chunks} chunks indexed`, 'success');
+      clearFile();
+      refreshDocs();
+    } catch(err) {
+      toast('Upload failed: ' + err.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<span>⬆</span> Upload';
+    }
+  }
+
+  // ── DOCUMENTS ─────────────────────────────────
+  async function refreshDocs() {
+    try {
+      const r = await fetch(`${API}/documents`);
+      const data = await r.json();
+      renderDocs(data.documents || []);
+    } catch { /* silent */ }
+  }
+
+  function renderDocs(docs) {
+    const el = document.getElementById('docsList');
+    if (!docs.length) {
+      el.innerHTML = '<div class="empty-docs">No documents yet.<br/>Upload one to get started.</div>';
+      return;
+    }
+    el.innerHTML = docs.map(d => `
+      <div class="doc-item">
+        <div class="doc-item-left">
+          <span class="doc-icon">${d.endsWith('.pdf') ? '📕' : '📄'}</span>
+          <span>${escapeHtml(d)}</span>
+        </div>
+        <button class="doc-del" onclick="deleteDoc('${escapeHtml(d)}')" title="Remove">✕</button>
+      </div>`).join('');
+  }
+
+  async function deleteDoc(name) {
+    await fetch(`${API}/documents/${encodeURIComponent(name)}`, { method: 'DELETE' });
+    toast(`Removed ${name}`, 'info');
+    refreshDocs();
+  }
+
+  // ── MODE ──────────────────────────────────────
+  function setMode(m) {
+    mode = m;
+    document.getElementById('tabAsk').classList.toggle('active', m === 'ask');
+    document.getElementById('tabSummarize').classList.toggle('active', m === 'summarize');
+    document.getElementById('queryBtnText').textContent = m === 'ask' ? 'Ask' : 'Summarize';
+    document.getElementById('queryInput').placeholder = m === 'ask'
+      ? 'Ask a question about your documents…'
+      : 'What topic would you like summarized?';
+  }
+
+  // ── QUERY ─────────────────────────────────────
+  async function runQuery() {
+    const q = document.getElementById('queryInput').value.trim();
+    if (!q) return toast('Enter a question first', 'error');
+
+    const btn = document.getElementById('queryBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> <span>Thinking…</span>';
+
+    const container = document.getElementById('outputContainer');
+    container.innerHTML = '<div class="output-loading"><div class="spinner"></div>Generating response…</div>';
+
+    try {
+      const ep = mode === 'ask'
+        ? `/ask?query=${encodeURIComponent(q)}`
+        : `/summary?query=${encodeURIComponent(q)}`;
+
+      const r    = await fetch(`${API}${ep}`);
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.detail || 'Request failed');
+
+      const text    = mode === 'ask' ? data.answer : data.summary;
+      const sources = mode === 'ask' ? (data.sources || []) : [];
+
+      let html = `<div class="output-box">${escapeHtml(text)}</div>`;
+      if (sources.length) {
+        html += `<div class="sources-list">` +
+          sources.map(s =>
+            `<span class="source-chip">📎 ${escapeHtml(s.source)}
+             <span style="opacity:.6">${(s.score * 100).toFixed(0)}%</span></span>`
+          ).join('') + `</div>`;
+      }
+      container.innerHTML = html;
+    } catch(err) {
+      container.innerHTML = `<div class="output-box" style="color:var(--red)">Error: ${escapeHtml(err.message)}</div>`;
+      toast('Request failed: ' + err.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = `<span>✦</span> <span id="queryBtnText">${mode === 'ask' ? 'Ask' : 'Summarize'}</span>`;
+    }
+  }
+
+  document.getElementById('queryInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); runQuery(); }
+  });
+
+  // ── TOAST ─────────────────────────────────────
+  function toast(msg, type = 'info') {
+    const el = document.createElement('div');
+    el.className = `toast-item toast-${type}`;
+    el.textContent = msg;
+    document.getElementById('toast').appendChild(el);
+    setTimeout(() => el.remove(), 3500);
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // Auto-start
+  checkHealth();
+  refreshDocs();
+</script>
+</body>
+</html>
